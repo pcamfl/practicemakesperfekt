@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practice Makes Perfekt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Custom Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px) rotate(-2deg); }
+            40%, 80% { transform: translateX(5px) rotate(2deg); }
+        }
+        .animate-shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-in-out;
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .animate-success {
+            animation: pulse-green 0.5s;
+            border-color: #22c55e !important;
+            background-color: rgba(34, 197, 94, 0.1);
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .animate-error {
+            animation: pulse-red 0.5s;
+            border-color: #ef4444 !important;
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .word-tile {
+            transition: all 0.2s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .word-tile:active {
+            transform: scale(0.95);
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center p-4">
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="glass-panel p-8 rounded-2xl max-w-md w-full text-center shadow-2xl z-10">
+        <div class="mb-6">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">Practice Makes Perfekt</h1>
+            <p class="text-slate-400 text-sm tracking-widest uppercase">GCSE German Edition</p>
+        </div>
+        
+        <div class="space-y-4 text-left mb-8 text-slate-300 text-sm">
+            <p>🎯 <strong class="text-white">Goal:</strong> Translate the English sentence before time runs out.</p>
+            <p>🧩 <strong class="text-white">How:</strong> Tap words to build the sentence. Word order matters!</p>
+            <p>⚠️ <strong class="text-white">Watch out:</strong> Auxiliaries (<em class="text-cyan-400">haben/sein</em>) go 2nd, Participles go LAST.</p>
+            <p>🔥 <strong class="text-white">Streak:</strong> Get multiple right in a row for massive score multipliers.</p>
+        </div>
+
+        <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition transform hover:-translate-y-1 text-lg">
+            START GAME
+        </button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="hidden w-full max-w-2xl flex-col h-full max-h-[800px]">
+        
+        <!-- Header / Stats -->
+        <header class="flex justify-between items-center bg-slate-800/50 p-4 rounded-2xl mb-4 border border-slate-700">
+            <div class="flex flex-col">
+                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Score</span>
+                <span id="score-display" class="text-2xl font-black text-white">0</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Streak</span>
+                <span id="streak-display" class="text-xl font-bold text-pink-500 flex items-center gap-1">
+                    x1 <span id="fire-emoji" class="hidden">🔥</span>
+                </span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Time</span>
+                <span id="time-display" class="text-2xl font-black text-cyan-400">60s</span>
+            </div>
+        </header>
+
+        <!-- Gameplay Area -->
+        <main class="flex-grow flex flex-col gap-4">
+            
+            <!-- The Prompt -->
+            <div class="glass-panel p-6 rounded-2xl text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-pink-500"></div>
+                <h2 class="text-slate-400 text-sm mb-1 uppercase tracking-widest font-semibold">Translate:</h2>
+                <h3 id="english-prompt" class="text-2xl md:text-3xl font-bold text-white">Loading...</h3>
+            </div>
+
+            <!-- Sentence Builder (Dropzone) -->
+            <div id="sentence-builder-container" class="glass-panel p-4 rounded-2xl min-h-[120px] border-2 border-dashed border-slate-600 flex flex-wrap content-start gap-2">
+                <!-- Selected words go here -->
+            </div>
+
+            <!-- Controls -->
+            <div class="flex gap-2 w-full">
+                <button onclick="clearSentence()" class="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition">
+                    Clear
+                </button>
+                <button onclick="checkAnswer()" class="flex-[2] py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition text-lg">
+                    Check Sentence
+                </button>
+            </div>
+
+            <!-- Word Bank -->
+            <div class="glass-panel p-4 rounded-2xl flex-grow">
+                <h4 class="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-3 text-center">Word Bank</h4>
+                <div id="word-bank" class="flex flex-wrap justify-center gap-3">
+                    <!-- Available words go here -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="game-over-screen" class="hidden glass-panel p-8 rounded-2xl max-w-md w-full text-center shadow-2xl z-20 absolute">
+        <h2 id="end-title" class="text-4xl font-extrabold text-white mb-2">Time's Up!</h2>
+        <p id="end-subtitle" class="text-slate-300 mb-6">Let's see how you did.</p>
+        
+        <div class="bg-slate-800/80 rounded-xl p-6 mb-8 border border-slate-700">
+            <p class="text-sm text-slate-400 uppercase tracking-wider mb-1">Final Score</p>
+            <p id="final-score" class="text-5xl font-black text-cyan-400 mb-4">0</p>
+            <div class="flex justify-between text-sm">
+                <span class="text-slate-300">Max Streak:</span>
+                <span id="final-streak" class="font-bold text-pink-500">x1</span>
+            </div>
+            <div class="flex justify-between text-sm mt-2">
+                <span class="text-slate-300">Sentences Built:</span>
+                <span id="final-count" class="font-bold text-white">0</span>
+            </div>
+        </div>
+
+        <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-pink-500/30 transition transform hover:-translate-y-1 text-lg">
+            PLAY AGAIN
+        </button>
+    </div>
+
+    <script>
+        // --- 60 GCSE GERMAN SENTENCES ---
+        const masterQuestionBank = [
+            // Hobbies & Free Time
+            { eng: "I have played football", correct: ["Ich", "habe", "Fußball", "gespielt"], distractors: ["bin", "gekauft", "Tennis"] },
+            { eng: "He has read a book", correct: ["Er", "hat", "ein Buch", "gelesen"], distractors: ["ist", "gesehen", "Buch"] },
+            { eng: "We have watched TV", correct: ["Wir", "haben", "ferngesehen"], distractors: ["sind", "gesehen", "Fernsehen"] },
+            { eng: "She listened to music", correct: ["Sie", "hat", "Musik", "gehört"], distractors: ["ist", "gespielt", "Radio"] },
+            { eng: "They danced yesterday", correct: ["Sie", "haben", "gestern", "getanzt"], distractors: ["sind", "gefeiert", "heute"] },
+            { eng: "I swam in the pool", correct: ["Ich", "bin", "im Schwimmbad", "geschwommen"], distractors: ["habe", "gebadet", "Schwimmbad"] },
+            { eng: "You (sing.) played the piano", correct: ["Du", "hast", "Klavier", "gespielt"], distractors: ["bist", "gemacht", "Gitarre"] },
+            { eng: "We met friends", correct: ["Wir", "haben", "Freunde", "getroffen"], distractors: ["sind", "gesehen", "Freund"] },
+            { eng: "He sang a song", correct: ["Er", "hat", "ein Lied", "gesungen"], distractors: ["ist", "gesagt", "Lied"] },
+            { eng: "I bought a T-shirt", correct: ["Ich", "habe", "ein T-Shirt", "gekauft"], distractors: ["bin", "getragen", "Hemd"] },
+            { eng: "She rode a bike", correct: ["Sie", "ist", "Rad", "gefahren"], distractors: ["hat", "gegangen", "Auto"] },
+            { eng: "We baked a cake", correct: ["Wir", "haben", "einen Kuchen", "gebacken"], distractors: ["sind", "gekocht", "Brot"] },
+            { eng: "They played computer games", correct: ["Sie", "haben", "Computerspiele", "gespielt"], distractors: ["sind", "gemacht", "Computer"] },
+            { eng: "I found my phone", correct: ["Ich", "habe", "mein Handy", "gefunden"], distractors: ["bin", "gesucht", "Telefon"] },
+            { eng: "He took photos", correct: ["Er", "hat", "Fotos", "gemacht"], distractors: ["ist", "genommen", "Bilder"] },
+
+            // Holidays & Travel
+            { eng: "We travelled to Germany", correct: ["Wir", "sind", "nach Deutschland", "gefahren"], distractors: ["haben", "gereist", "in"] },
+            { eng: "I flew to Spain", correct: ["Ich", "bin", "nach Spanien", "geflogen"], distractors: ["habe", "gegangen", "Spanien"] },
+            { eng: "She stayed in a hotel", correct: ["Sie", "ist", "in einem Hotel", "geblieben"], distractors: ["hat", "gewohnt", "Hotel"] },
+            { eng: "We went to the beach", correct: ["Wir", "sind", "an den Strand", "gegangen"], distractors: ["haben", "gefahren", "Küste"] },
+            { eng: "He lost his passport", correct: ["Er", "hat", "seinen Pass", "verloren"], distractors: ["ist", "gesucht", "Pass"] },
+            { eng: "They bought souvenirs", correct: ["Sie", "haben", "Andenken", "gekauft"], distractors: ["sind", "genommen", "Geschenke"] },
+            { eng: "I packed my suitcase", correct: ["Ich", "habe", "meinen Koffer", "gepackt"], distractors: ["bin", "gemacht", "Tasche"] },
+            { eng: "We visited a museum", correct: ["Wir", "haben", "ein Museum", "besucht"], distractors: ["sind", "gesehen", "Museum"] },
+            { eng: "You hiked in the mountains", correct: ["Du", "bist", "in den Bergen", "gewandert"], distractors: ["hast", "gegangen", "Berg"] },
+            { eng: "She sent a postcard", correct: ["Sie", "hat", "eine Postkarte", "geschrieben"], distractors: ["ist", "geschickt", "Brief"] },
+            { eng: "I relaxed yesterday", correct: ["Ich", "habe", "mich", "gestern", "entspannt"], distractors: ["bin", "ausgeruht", "heute"] },
+            { eng: "We arrived late", correct: ["Wir", "sind", "spät", "angekommen"], distractors: ["haben", "gekommen", "früh"] },
+            { eng: "He sunbathed", correct: ["Er", "hat", "sich", "gesonnt"], distractors: ["ist", "gebadet", "Sonne"] },
+            { eng: "They saw the sights", correct: ["Sie", "haben", "die Sehenswürdigkeiten", "gesehen"], distractors: ["sind", "geschaut", "Stadt"] },
+            { eng: "I camped in the forest", correct: ["Ich", "habe", "im Wald", "gecampt"], distractors: ["bin", "geschlafen", "Zelt"] },
+
+            // School & Routine
+            { eng: "I did my homework", correct: ["Ich", "habe", "meine Hausaufgaben", "gemacht"], distractors: ["bin", "getan", "Aufgabe"] },
+            { eng: "She understood the teacher", correct: ["Sie", "hat", "den Lehrer", "verstanden"], distractors: ["ist", "gehört", "Lehrerin"] },
+            { eng: "We learned German", correct: ["Wir", "haben", "Deutsch", "gelernt"], distractors: ["sind", "studiert", "Englisch"] },
+            { eng: "He forgot his pen", correct: ["Er", "hat", "seinen Kuli", "vergessen"], distractors: ["ist", "verloren", "Stift"] },
+            { eng: "They wrote a test", correct: ["Sie", "haben", "eine Klassenarbeit", "geschrieben"], distractors: ["sind", "gemacht", "Prüfung"] },
+            { eng: "I woke up at 7 o'clock", correct: ["Ich", "bin", "um 7 Uhr", "aufgewacht"], distractors: ["habe", "geweckt", "8 Uhr"] },
+            { eng: "She got up early", correct: ["Sie", "ist", "früh", "aufgestanden"], distractors: ["hat", "gegangen", "spät"] },
+            { eng: "We worked in the garden", correct: ["Wir", "haben", "im Garten", "gearbeitet"], distractors: ["sind", "gemacht", "Park"] },
+            { eng: "You spoke German", correct: ["Du", "hast", "Deutsch", "gesprochen"], distractors: ["bist", "gesagt", "Englisch"] },
+            { eng: "I read the text", correct: ["Ich", "habe", "den Text", "gelesen"], distractors: ["bin", "geschrieben", "Buch"] },
+            { eng: "He brought his book", correct: ["Er", "hat", "sein Buch", "mitgebracht"], distractors: ["ist", "genommen", "Heft"] },
+            { eng: "They went to school", correct: ["Sie", "sind", "zur Schule", "gegangen"], distractors: ["haben", "gefahren", "Schule"] },
+            { eng: "We answered the question", correct: ["Wir", "haben", "die Frage", "beantwortet"], distractors: ["sind", "gefragt", "Antwort"] },
+            { eng: "I earned money", correct: ["Ich", "habe", "Geld", "verdient"], distractors: ["bin", "gewonnen", "Euro"] },
+            { eng: "She helped her mother", correct: ["Sie", "hat", "ihrer Mutter", "geholfen"], distractors: ["ist", "gemacht", "Vater"] },
+
+            // Food, Drink & Home
+            { eng: "I ate a pizza", correct: ["Ich", "habe", "eine Pizza", "gegessen"], distractors: ["bin", "getrunken", "Nudeln"] },
+            { eng: "We drank water", correct: ["Wir", "haben", "Wasser", "getrunken"], distractors: ["sind", "gegessen", "Cola"] },
+            { eng: "He cooked dinner", correct: ["Er", "hat", "das Abendessen", "gekocht"], distractors: ["ist", "gemacht", "Mittagessen"] },
+            { eng: "They washed the dishes", correct: ["Sie", "haben", "abgewaschen"], distractors: ["sind", "gewaschen", "Teller"] },
+            { eng: "I cleaned my room", correct: ["Ich", "habe", "mein Zimmer", "aufgeräumt"], distractors: ["bin", "geputzt", "Haus"] },
+            { eng: "She slept well", correct: ["Sie", "hat", "gut", "geschlafen"], distractors: ["ist", "geträumt", "schlecht"] },
+            { eng: "We went shopping", correct: ["Wir", "haben", "eingekauft"], distractors: ["sind", "gekauft", "Geschäft"] },
+            { eng: "You lived in Berlin", correct: ["Du", "hast", "in Berlin", "gewohnt"], distractors: ["bist", "gelebt", "München"] },
+            { eng: "I washed my hair", correct: ["Ich", "habe", "mir die Haare", "gewaschen"], distractors: ["bin", "geduscht", "Kopf"] },
+            { eng: "He took a shower", correct: ["Er", "hat", "sich", "geduscht"], distractors: ["ist", "gebadet", "gewaschen"] },
+            { eng: "They watched the film", correct: ["Sie", "haben", "den Film", "gesehen"], distractors: ["sind", "geschaut", "Kino"] },
+            { eng: "We drank lemonade", correct: ["Wir", "haben", "Limo", "getrunken"], distractors: ["sind", "Saft", "gegessen"] },
+            { eng: "I ordered a burger", correct: ["Ich", "habe", "einen Burger", "bestellt"], distractors: ["bin", "gekauft", "Pommes"] },
+            { eng: "She made breakfast", correct: ["Sie", "hat", "das Frühstück", "gemacht"], distractors: ["ist", "gekocht", "Essen"] },
+            { eng: "He fed the dog", correct: ["Er", "hat", "den Hund", "gefüttert"], distractors: ["ist", "gegessen", "Katze"] }
+        ];
+
+        // --- STATE VARIABLES ---
+        let score = 0;
+        let timeLeft = 60;
+        let streak = 1;
+        let maxStreak = 1;
+        let sentencesCompleted = 0;
+        let timerInterval;
+        
+        let currentQuestionList = [];
+        let currentQuestion = null;
+        let availableWords = []; 
+        let selectedWords = [];  
+
+        // --- DOM ELEMENTS ---
+        const screens = {
+            start: document.getElementById('start-screen'),
+            game: document.getElementById('game-screen'),
+            over: document.getElementById('game-over-screen')
+        };
+        const displays = {
+            score: document.getElementById('score-display'),
+            time: document.getElementById('time-display'),
+            streak: document.getElementById('streak-display'),
+            prompt: document.getElementById('english-prompt'),
+            builder: document.getElementById('sentence-builder-container'),
+            bank: document.getElementById('word-bank'),
+            fireEmoji: document.getElementById('fire-emoji'),
+            endTitle: document.getElementById('end-title'),
+            endSubtitle: document.getElementById('end-subtitle')
+        };
+
+        // --- CORE FUNCTIONS ---
+
+        function startGame() {
+            // Hide Start & Over screens, Show Game screen
+            screens.start.classList.add('hidden');
+            screens.over.classList.add('hidden');
+            screens.over.classList.remove('flex');
+            screens.game.classList.remove('hidden');
+            screens.game.classList.add('flex');
+            
+            // Reset state
+            score = 0;
+            timeLeft = 60;
+            streak = 1;
+            maxStreak = 1;
+            sentencesCompleted = 0;
+            
+            // Clone and Shuffle the question bank to prevent repeats
+            currentQuestionList = [...masterQuestionBank];
+            shuffleArray(currentQuestionList);
+
+            updateStats();
+            clearInterval(timerInterval); // ensure no duplicate intervals
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            loadNextQuestion();
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function updateTimer() {
+            timeLeft--;
+            displays.time.innerText = timeLeft + "s";
+            
+            if (timeLeft <= 10 && timeLeft > 0) {
+                displays.time.classList.remove('text-cyan-400');
+                displays.time.classList.add('text-red-500', 'animate-pulse');
+            } else {
+                displays.time.classList.add('text-cyan-400');
+                displays.time.classList.remove('text-red-500', 'animate-pulse');
+            }
+
+            if (timeLeft <= 0) {
+                endGame(false);
+            }
+        }
+
+        function updateStats() {
+            displays.score.innerText = score;
+            displays.streak.innerHTML = `x${streak} <span class="${streak >= 3 ? '' : 'hidden'} text-xl">🔥</span>`;
+            
+            if (streak >= 3) {
+                displays.streak.parentElement.classList.add('animate-pop');
+                setTimeout(() => displays.streak.parentElement.classList.remove('animate-pop'), 300);
+            }
+        }
+
+        function loadNextQuestion() {
+            // Check if player has miraculously completed all 60 sentences
+            if (currentQuestionList.length === 0) {
+                endGame(true);
+                return;
+            }
+
+            // Pop a unique question from the end of the shuffled list
+            currentQuestion = currentQuestionList.pop();
+            
+            displays.prompt.innerText = currentQuestion.eng;
+            displays.prompt.parentElement.classList.add('animate-pop');
+            setTimeout(() => displays.prompt.parentElement.classList.remove('animate-pop'), 300);
+
+            // Prepare word pool
+            let allWords = [...currentQuestion.correct, ...currentQuestion.distractors];
+            
+            availableWords = allWords.map((word, index) => ({
+                id: `word-${index}-${Date.now()}`,
+                text: word
+            }));
+
+            shuffleArray(availableWords);
+            selectedWords = [];
+            renderBoard();
+        }
+
+        function renderBoard() {
+            displays.builder.innerHTML = '';
+            selectedWords.forEach((word) => {
+                const btn = createWordButton(word, true);
+                displays.builder.appendChild(btn);
+            });
+
+            displays.bank.innerHTML = '';
+            availableWords.forEach(word => {
+                const btn = createWordButton(word, false);
+                displays.bank.appendChild(btn);
+            });
+        }
+
+        function createWordButton(wordObj, isSelected) {
+            const btn = document.createElement('button');
+            btn.innerText = wordObj.text;
+            btn.className = `word-tile px-4 py-3 rounded-xl font-bold text-sm md:text-base shadow-md 
+                             ${isSelected 
+                                ? 'bg-indigo-600 text-white border-2 border-indigo-400 hover:bg-indigo-700' 
+                                : 'bg-slate-700 text-slate-200 border-2 border-slate-600 hover:bg-slate-600 hover:border-slate-400'}`;
+            
+            btn.onclick = () => isSelected ? moveToBank(wordObj.id) : moveToBuilder(wordObj.id);
+            return btn;
+        }
+
+        function moveToBuilder(id) {
+            const wordIndex = availableWords.findIndex(w => w.id === id);
+            if (wordIndex > -1) {
+                const word = availableWords.splice(wordIndex, 1)[0];
+                selectedWords.push(word);
+                renderBoard();
+            }
+        }
+
+        function moveToBank(id) {
+            const wordIndex = selectedWords.findIndex(w => w.id === id);
+            if (wordIndex > -1) {
+                const word = selectedWords.splice(wordIndex, 1)[0];
+                availableWords.push(word);
+                renderBoard();
+            }
+        }
+
+        function clearSentence() {
+            if (selectedWords.length === 0) return;
+            availableWords = [...availableWords, ...selectedWords];
+            selectedWords = [];
+            renderBoard();
+        }
+
+        function checkAnswer() {
+            if (selectedWords.length === 0) return;
+
+            const userSentence = selectedWords.map(w => w.text);
+            const correctSentence = currentQuestion.correct;
+            const builderContainer = displays.builder;
+
+            const isCorrect = userSentence.length === correctSentence.length && 
+                              userSentence.every((val, index) => val === correctSentence[index]);
+
+            if (isCorrect) {
+                builderContainer.classList.add('animate-success');
+                setTimeout(() => builderContainer.classList.remove('animate-success'), 500);
+
+                const basePoints = 50;
+                score += (basePoints * streak);
+                timeLeft += 8; // Increased time reward here
+                sentencesCompleted++;
+                
+                streak++;
+                if (streak > maxStreak) maxStreak = streak;
+
+                updateStats();
+                showFloatingText('+8s', 'text-green-400'); // Updated floating text
+                setTimeout(loadNextQuestion, 600);
+
+            } else {
+                builderContainer.classList.add('animate-error', 'animate-shake');
+                setTimeout(() => builderContainer.classList.remove('animate-error', 'animate-shake'), 500);
+
+                streak = 1;
+                timeLeft -= 5;
+                updateStats();
+                showFloatingText('-5s', 'text-red-500');
+            }
+        }
+
+        function showFloatingText(text, colorClass) {
+            const floatText = document.createElement('div');
+            floatText.innerText = text;
+            floatText.className = `absolute text-2xl font-black ${colorClass} z-50 pointer-events-none`;
+            
+            const timeRect = displays.time.getBoundingClientRect();
+            floatText.style.left = `${timeRect.left - 20}px`;
+            floatText.style.top = `${timeRect.top + 20}px`;
+            
+            floatText.style.transition = 'all 1s ease-out';
+            floatText.style.transform = 'translateY(0) scale(1)';
+            floatText.style.opacity = '1';
+            
+            document.body.appendChild(floatText);
+            void floatText.offsetWidth; // Trigger reflow
+
+            floatText.style.transform = 'translateY(-40px) scale(1.5)';
+            floatText.style.opacity = '0';
+
+            setTimeout(() => floatText.remove(), 1000);
+        }
+
+        function endGame(perfectClear) {
+            clearInterval(timerInterval);
+            
+            screens.game.classList.add('hidden');
+            screens.game.classList.remove('flex');
+            
+            screens.over.classList.remove('hidden');
+            screens.over.classList.add('flex', 'flex-col', 'items-center', 'justify-center');
+
+            if (perfectClear) {
+                displays.endTitle.innerText = "PERFECT CLEAR!";
+                displays.endTitle.classList.add('text-transparent', 'bg-clip-text', 'bg-gradient-to-r', 'from-green-400', 'to-blue-500');
+                displays.endSubtitle.innerText = "You translated every single sentence!";
+            } else {
+                displays.endTitle.innerText = "Time's Up!";
+                displays.endTitle.classList.remove('text-transparent', 'bg-clip-text', 'bg-gradient-to-r', 'from-green-400', 'to-blue-500');
+                displays.endSubtitle.innerText = "Let's see how you did.";
+            }
+
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-streak').innerText = `x${maxStreak}`;
+            document.getElementById('final-count').innerText = sentencesCompleted;
+        }
+
+    </script>
+</body>
+</html>
+
+
